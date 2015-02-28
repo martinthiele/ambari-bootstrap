@@ -15,13 +15,13 @@ set -o pipefail
 # defaults can be overriden by setting variables in the environment:
 #   For example:
 #       export java_provider=oracle
-#       export install_ambari_server=true
+#export install_ambari_server=true
 #       sh ambari-bootstrap.sh
 
 install_ambari_agent="${install_ambari_agent:-true}"
 install_ambari_server="${install_ambari_server:-false}"
 java_provider="${java_provider:-open}" # accepts: open, oracle
-ambari_server="${ambari_server:-localhost}"
+ambari_server="${ambari_server:-hdp1.hwx.com}"
 ambari_version="${ambari_version:-1.7.0}"
 ambari_repo="${ambari_repo:-http://public-repo-1.hortonworks.com/ambari/centos6/1.x/updates/${ambari_version}/ambari.repo}"
 ambari_aptsource="" # TODO
@@ -151,10 +151,14 @@ case "${lsb_dist}" in
 
         if [ "${java_provider}" != 'oracle' ]; then
             printf "## installing java\n"
-            yum install -y java7-devel
-            mkdir -p /usr/java
+	        wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/7u75-b13/jdk-7u75-linux-x64.rpm -O /tmp/jdk-7u75-linux-x64.rpm
+            wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jce/7/UnlimitedJCEPolicyJDK7.zip -O /tmp/UnlimitedJCEPolicyJDK7.zip
+            yum install -y /tmp/jdk-7u75-linux-x64.rpm
             ln -s /etc/alternatives/java_sdk /usr/java/default
             JAVA_HOME='/usr/java/default'
+	        echo 'export JAVA_HOME=/usr/java/default'>/etc/profile.d/java.sh
+            echo 'export PATH=$JAVA_HOME/bin:$PATH'>>/etc/profile.d/java.sh
+            source /etc/profile.d/java.sh
         fi
 
         printf "## fetch ambari repo\n"
@@ -167,20 +171,16 @@ case "${lsb_dist}" in
             sed -i.orig -r 's/^[[:space:]]*hostname=.*/hostname='"${ambari_server}"'/' \
                 /etc/ambari-agent/conf/ambari-agent.ini
             ambari-agent start
-            chkconfig ambari-agent on
         fi
         if [ "${install_ambari_server}" = true ]; then
             printf "## install ambari-server\n"
             yum install -y ambari-server
             if [ "${java_provider}" = 'oracle' ]; then
-                ambari-server setup -s
+                ambari-server setup -s -j /usr/java/default
             else
                 ambari-server setup -j "${JAVA_HOME}" -s
             fi
-            if ! nohup sh -c "service ambari-server start 2>&1 > /dev/null"; then
-                printf 'Ambari Server failed to start\n' >&2
-            fi
-            chkconfig ambari-server on
+            ambari-server start
         fi
         printf "## Success! All done.\n"
         exit 0
@@ -205,4 +205,3 @@ cat >&2 <<'EOF'
 
 EOF
 exit 1
-
