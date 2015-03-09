@@ -147,18 +147,37 @@ case "${lsb_dist}" in
             chkconfig ntpd on || true
             ntpd -q || true
             service ntpd restart || true
+
+	   printf "##Set Swapiness\n"
+	   echo -e "\nSetting Swapiness to 0"
+	   echo 0 | sudo tee /proc/sys/vm/swappiness
+           echo vm.swappiness = 0 | sudo tee -a /etc/sysctl.conf
+
+	   printf "##Turn on NSCD\n"
+	   echo -e "\nTurning on NSCD"
+	   chkconfig --level 345 ncsd on
+	   ncsd -g
+
+	   printf "##Set File Handle Limits\n"
+	   echo -e "\nSetting File Handle Limits"
+	   echo hdfs – nofile 32768 >> /etc/security/limits.conf
+	   echo mapred – nofile 32768 >> /etc/security/limits.conf
+	   echo hbase – nofile 32768 >> /etc/security/limits.conf
+	   echo hdfs – nproc 32768 >> /etc/security/limits.conf
+	   echo mapred – nofile 32768 >> /etc/security/limits.conf
+	   echo hbase – nofile 32768 >> /etc/security/limits.conf
         )
 
         if [ "${java_provider}" != 'oracle' ]; then
             printf "## installing java\n"
-	        wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/7u75-b13/jdk-7u75-linux-x64.rpm -O /tmp/jdk-7u75-linux-x64.rpm
+	    wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/7u75-b13/jdk-7u75-linux-x64.rpm -O /tmp/jdk-7u75-linux-x64.rpm
             wget --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jce/7/UnlimitedJCEPolicyJDK7.zip -O /tmp/UnlimitedJCEPolicyJDK7.zip
             yum install -y /tmp/jdk-7u75-linux-x64.rpm
             ln -s /etc/alternatives/java_sdk /usr/java/default
             JAVA_HOME='/usr/java/default'
-	        echo 'export JAVA_HOME=/usr/java/default'>/etc/profile.d/java.sh
+	    echo 'export JAVA_HOME=/usr/java/default'>/etc/profile.d/java.sh
             echo 'export PATH=$JAVA_HOME/bin:$PATH'>>/etc/profile.d/java.sh
-            source /etc/profile.d/java.sh
+            source /etc/profile.d/java.sh	
         fi
 
         printf "## fetch ambari repo\n"
@@ -205,3 +224,4 @@ cat >&2 <<'EOF'
 
 EOF
 exit 1
+
